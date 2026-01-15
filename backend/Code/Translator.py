@@ -4,17 +4,19 @@ from backend.Code import Translation
 
 
 class Translator(ast.NodeVisitor):
+    """Translates Python code to c++ code."""
     def __init__(self):
         self.abstractSyntaxTree = None
         self.cppCode = Translation.Translation()
         self.variables = {}
         self.imports = set()
 
-    #adds semicolon and new line character
     def addSemicolon(self):
+        """Adds semicolon and new line character."""
         self.cppCode.addCodeElement(";\n", "semicolon")
 
-    def createTypeAnnotation(self, value):
+    def createTypeAnnotation(self, value) -> str:
+        """Creates and returns type annotation for assignment of variables, e.g. int."""
         if isinstance(value, ast.Name):
             return self.variables.get(value.id)
         elif isinstance(value, ast.Constant):
@@ -28,18 +30,18 @@ class Translator(ast.NodeVisitor):
             return "auto"
         elif isinstance(value, ast.List):
             if len(value.elts) == 0:
-                return "auto"
+                return "vector<auto>"
             firstType = self.createTypeAnnotation(value.elts[0])
             for elt in value.elts[1:]:
                 if self.createTypeAnnotation(elt) != firstType:
-                    return "auto"
-            self.imports.add("vector")
+                    return "vector<auto>"
             return "vector<" + firstType + ">"
 
         else:
             raise TypeError(f"Unsupported node type: {type(value)}")
 
-    def createValue(self, value):
+    def createValue(self, value) -> str:
+        """Evaluates an expression, translates it into c++ and returns it."""
         if isinstance(value, ast.Name):
             return value.id
         elif isinstance(value, ast.Constant):
@@ -56,6 +58,12 @@ class Translator(ast.NodeVisitor):
             return "*"
         elif isinstance(value, ast.Div):
             return "/"
+        elif isinstance(value, ast.BitOr):
+            return "|"
+        elif isinstance(value, ast.BitXor):
+            return "^"
+        elif isinstance(value, ast.BitAnd):
+            return "&"
         elif isinstance(value, ast.Call):
             expression = ""
             if isinstance(value.func, ast.Attribute):
@@ -71,21 +79,31 @@ class Translator(ast.NodeVisitor):
             expression += ")"
             return expression
         elif isinstance(value, ast.List):
+            self.imports.add("vector")
             if len(value.elts) == 0:
                 return "vector<auto>"
 
             first_type = self.createTypeAnnotation(value.elts[0])
             for elt in value.elts[1:]:
                 if self.createTypeAnnotation(elt) != first_type:
-                    return "std::vector<auto> "
+                    return "vector<auto>"
 
             return "vector<" + first_type + ">"
+        #todo low priority
+        elif isinstance(value, ast.Tuple):
+            self.imports.add("tuple")
+            return None
+        elif isinstance(value, ast.Dict):
+            self.imports.add("map")
+            return None
+        elif isinstance(value, ast.Set):
+            self.imports.add("set")
+            return None
         else:
             raise TypeError(f"Unsupported node type: {type(value)}")
 
-
     #@Override of functions from ast module
-    def visit_Assign(self, node):
+    def visit_Assign(self, node) -> None:
         variableType = self.createTypeAnnotation(node.value)
 
         names = []
@@ -98,6 +116,7 @@ class Translator(ast.NodeVisitor):
                     if isinstance(element, ast.Name):
                         names.append(element.id)
                         self.variables[element.id] = variableType
+
         translation = variableType + ' '
         for i in range(len(names)):
             translation += names[i]
@@ -107,21 +126,22 @@ class Translator(ast.NodeVisitor):
 
         translation += self.createValue(node.value)
 
+        #todo inaccurate - makes entire line an assignment even if it contains e.g. calls
         self.cppCode.addCodeElement(translation, "assignment")
         self.addSemicolon()
 
-    def translate(self, text):
+    def translate(self, text: str) -> None:
         #todo Syntax Error handling
         self.abstractSyntaxTree = ast.parse(text)
         self.visit(self.abstractSyntaxTree)
 
-    def printAst(self, text):
+    #debbuging functions
+    def printAst(self, text: str | None) -> None:
         if self.abstractSyntaxTree:
             print(self.abstractSyntaxTree)
         else:
             self.abstractSyntaxTree = ast.parse(text)
             print(ast.dump(self.abstractSyntaxTree, indent=4))
 
-    #debbuging functions
-    def printCode(self):
+    def printCode(self) -> None:
         print(self.cppCode.printCode())

@@ -7,9 +7,10 @@ class Translation:
         self.codeLines = []
         self.codeElements = []
 
-    def addCodeElement(self, code, codeType):
+    #todo create CodeType class or find out that it's unnecessary
+    def addCodeElement(self, code: str, codeType: str) -> None:
         self.code += code
         self.codeElements.append(CodeElement.CodeElement(code, codeType))
 
-    def printCode(self):
+    def printCode(self) -> None:
         print(self.code)
