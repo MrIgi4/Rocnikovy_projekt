@@ -9,7 +9,9 @@ class Translator(ast.NodeVisitor):
         self.abstractSyntaxTree = None
         self.cppCode = Translation.Translation()
         self.variables = {}
+        self.indentVariables: list[list[str]] = [] #list of variables by indentation for deletion after their scope is exited
         self.imports = set()
+        self.indentation = 0
 
     def addSemicolon(self):
         """Adds semicolon and new line character."""
@@ -36,7 +38,15 @@ class Translator(ast.NodeVisitor):
                 if self.createTypeAnnotation(elt) != firstType:
                     return "vector<auto>"
             return "vector<" + firstType + ">"
-
+        #todo low priority
+        elif isinstance(value, ast.Tuple):
+            return None
+        elif isinstance(value, ast.Dict):
+            return None
+        elif isinstance(value, ast.Set):
+            return None
+        elif isinstance(value, ast.Compare):
+            return "bool"
         else:
             raise TypeError(f"Unsupported node type: {type(value)}")
 
@@ -50,6 +60,8 @@ class Translator(ast.NodeVisitor):
             return self.createValue(value.left) + " " + self.createValue(value.op) + " " + self.createValue(value.right)
         elif isinstance(value, ast.UnaryOp):
             return self.createValue(value.op) + self.createValue(value.operand)
+        elif isinstance(value, ast.Compare):
+            return self.createValue(value.left) + " " + self.createValue(value.ops[0]) + " " + self.createValue(value.comparators[0])
         elif isinstance(value, ast.Add):
             return "+"
         elif isinstance(value, ast.Sub):
@@ -64,6 +76,23 @@ class Translator(ast.NodeVisitor):
             return "^"
         elif isinstance(value, ast.BitAnd):
             return "&"
+        elif isinstance(value, ast.Eq):
+            return "=="
+        elif isinstance(value, ast.Lt):
+            return "<"
+        elif isinstance(value, ast.LtE):
+            return "<="
+        elif isinstance(value, ast.Gt):
+            return ">"
+        elif isinstance(value, ast.GtE):
+            return ">="
+        #todo check is
+        ##elif isinstance(value, ast.Is):
+            return "is"
+        ##elif isinstance(value, ast.IsNot):
+            return "is not"
+        elif isinstance(value, ast.Not):
+            return "!"
         elif isinstance(value, ast.Call):
             expression = ""
             if isinstance(value.func, ast.Attribute):
@@ -102,33 +131,62 @@ class Translator(ast.NodeVisitor):
         else:
             raise TypeError(f"Unsupported node type: {type(value)}")
 
+    def emitCode(self, code: str, codeType: str) -> None:
+        #todo - inaccurate - makes entire line an assignment even if it contains e.g. calls
+        self.cppCode.addCodeElement("    " * self.indentation + code, codeType)
+
+    def assignTarget(self, target, variableType: str) -> None:
+        self.variables[target.id] = variableType
+        if len(self.indentVariables) <= self.indentation:
+            self.indentVariables.append([])
+        self.indentVariables[self.indentation].append(target.id)
+
     #@Override of functions from ast module
     def visit_Assign(self, node) -> None:
         variableType = self.createTypeAnnotation(node.value)
+
+        if  self.variables.keys().__contains__(node.targets[0].id):
+            translation = ""
+        else:
+            translation = variableType + ' '
 
         names = []
         for target in node.targets:
             if isinstance(target, ast.Name):
                 names.append(target.id)
-                self.variables[target.id] = variableType
+                self.assignTarget(target, variableType)
             elif isinstance(target, ast.Tuple):
                 for element in target.elts:
                     if isinstance(element, ast.Name):
                         names.append(element.id)
-                        self.variables[element.id] = variableType
+                        self.assignTarget(element, variableType)
 
-        translation = variableType + ' '
+        variables = ""
         for i in range(len(names)):
-            translation += names[i]
+            variables += names[i]
             if i != len(names) - 1:
-                translation += ", "
-        translation += " = "
+                variables += ", "
 
+        translation += variables + " = "
         translation += self.createValue(node.value)
 
-        #todo inaccurate - makes entire line an assignment even if it contains e.g. calls
-        self.cppCode.addCodeElement(translation, "assignment")
+        self.emitCode(translation, "assignment")
         self.addSemicolon()
+
+    def exitBlock(self):
+        for variable in self.indentVariables[self.indentation]:
+            self.variables.pop(variable)
+        self.indentVariables.pop(self.indentation - 1)
+        self.indentation -= 1
+
+    def visit_If(self, node) -> None:
+        expression = self.createValue(node.test)
+        self.emitCode("if (" + expression + ") {\n", "if")
+        self.indentation += 1
+        for stmt in node.body:
+            self.visit(stmt)
+        self.exitBlock()
+        self.emitCode("}\n", "endbracket")
 
     def translate(self, text: str) -> None:
         #todo Syntax Error handling
