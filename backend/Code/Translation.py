@@ -8,6 +8,7 @@ class Translation:
         self.globalElements = []
         self.finalCodeElements = []
         self.toMain = True
+        self.currentClass = None
         self.imports = set()
 
     #todo create CodeType class or find out that it's unnecessary
@@ -23,8 +24,7 @@ class Translation:
             self.globalElements.append(elem)
 
     def wrapMain(self) -> None:
-        wrapped = []
-        wrapped.append(CodeElement.CodeElement("int main() {\n", "main"))
+        wrapped = [CodeElement.CodeElement("int main() {\n", "main")]
 
         for element in self.mainElements:
             wrapped.append(CodeElement.CodeElement("    " + element.code, element.codeType))
@@ -43,6 +43,8 @@ class Translation:
     def finalCombineGlobalAndMain(self):
         for element in self.globalElements:
             self.finalCodeElements.append(element)
+        if len(self.globalElements) > 0:
+            self.finalCodeElements.append(CodeElement.CodeElement("\n", "separating line"))
         for element in self.mainElements:
             self.finalCodeElements.append(element)
 
