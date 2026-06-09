@@ -13,29 +13,48 @@ class Translator(ast.NodeVisitor):
         self.abstractSyntaxTree = None
         self.translation = Translation.Translation()
         self.variables = {}
-
         # List of variables by indentation for deletion after their scope is exited
         # Initialized with global scope
         self.scopedVariables: list[list[str]] = [[]]
+        self.classes: list[str] = []
+        self.classVariables: dict[str, dict[str, str]] = {}
 
     def createTypeAnnotation(self, value) -> str:
         """Creates and returns type annotation for assignment of variables, e.g. int."""
         if isinstance(value, ast.Name):
             return self.variables.get(value.id)
+
         elif isinstance(value, ast.Constant):
             string = str(type(value.value))
             # Remove irrelevant part of type annotation
-            return string[8:len(string) - 2]
+            variable_type = string[8:len(string) - 2]
+            return "string" if variable_type == "str" else variable_type
+
         elif isinstance(value, ast.BinOp):
             return self.createTypeAnnotation(value.left)
+
         elif isinstance(value, ast.UnaryOp):
             return self.createTypeAnnotation(value.operand)
+
         elif isinstance(value, ast.Call):
+            if isinstance(value.func, ast.Name) and value.func.id in self.classes:
+                return value.func.id
             return "auto"
+
         elif isinstance(value, ast.Attribute):
             if isinstance(value.value, ast.Name) and value.value.id == "self":
-                # Look up the variable type we stored during the __init__ pre-pass
-                return self.variables.get(value.attr)
+                if self.translation.currentClass and self.translation.currentClass in self.classVariables:
+                    if value.attr in self.classVariables[self.translation.currentClass]:
+                        return self.classVariables[self.translation.currentClass][value.attr]
+            else:
+                obj_type = self.createTypeAnnotation(value.value)
+                if obj_type in self.classVariables and value.attr in self.classVariables[obj_type]:
+                    return self.classVariables[obj_type][value.attr]
+
+            var_type = self.variables.get(value.attr)
+            if var_type is not None:
+                return var_type
+
             return self.raiseOrAuto(value)
         elif isinstance(value, ast.List):
             self.translation.imports.add("vector")
@@ -46,6 +65,7 @@ class Translator(ast.NodeVisitor):
                 if self.createTypeAnnotation(elt) != firstType:
                     return "vector<auto>"
             return "vector<" + firstType + ">"
+
         #todo low priority
         elif isinstance(value, ast.Tuple):
             return self.raiseOrAuto(value)
@@ -62,16 +82,25 @@ class Translator(ast.NodeVisitor):
         """Evaluates an expression, translates it into c++ and returns it."""
         if isinstance(value, ast.Name):
             return value.id
+
         elif isinstance(value, ast.Constant):
+            if isinstance(value.value, str):
+                return "\"" + str(value.value) + "\""
+            elif isinstance(value.value, bool):
+                return "true" if value.value else "false"
             return str(value.value)
+
         elif isinstance(value, ast.BinOp):
             return self.translateExpression(value.left) + " " + self.translateExpression(
                 value.op) + " " + self.translateExpression(value.right)
+
         elif isinstance(value, ast.UnaryOp):
             return self.translateExpression(value.op) + self.translateExpression(value.operand)
+
         elif isinstance(value, ast.Compare):
             return self.translateExpression(value.left) + " " + self.translateExpression(
                 value.ops[0]) + " " + self.translateExpression(value.comparators[0])
+
         elif isinstance(value, ast.Add):
             return "+"
         elif isinstance(value, ast.Sub) or isinstance(value, ast.USub):
@@ -103,6 +132,7 @@ class Translator(ast.NodeVisitor):
             return "is not"
         elif isinstance(value, ast.Not):
             return "!"
+
         elif isinstance(value, ast.Call):
             expression = ""
             if isinstance(value.func, ast.Attribute):
@@ -120,12 +150,14 @@ class Translator(ast.NodeVisitor):
                     expression += ", "
             expression += ")"
             return expression
+
         elif isinstance(value, ast.Attribute):
             if isinstance(value.value, ast.Name) and value.value.id == "self":
                 return "this->" + value.attr
             else:
-                # Handle other attributes like library calls
+                # Handle class variables
                 return self.translateExpression(value.value) + "." + value.attr
+
         elif isinstance(value, ast.List):
             self.translation.imports.add("vector")
             if len(value.elts) == 0:
@@ -169,47 +201,38 @@ class Translator(ast.NodeVisitor):
         return "auto"
 
     # @Override of functions from ast module
+    def visit_Expr(self, node) -> None:
+        translated_expression = self.translateExpression(node.value)
+        if translated_expression:
+            self.translation.emit(translated_expression + ";", "expression")
+
     def visit_Assign(self, node) -> None:
         variableType = self.createTypeAnnotation(node.value)
+        valueString = self.translateExpression(node.value)
 
-        isReassignment = False
-        target = node.targets[0]
-
-        if isinstance(target, ast.Name):
-            isReassignment = target.id in self.variables
-        elif isinstance(target, ast.Attribute):
-            if isinstance(target.value, ast.Name) and target.value.id == "self":
-                # Class variable - the class pre-pass already declared it
-                isReassignment = True
-
-        if isReassignment:
-            translation = ""
-        else:
-            translation = variableType + ' '
-
-        names = []
+        # Process each target individually to support chained assignments (differ in Python and C++)
         for target in node.targets:
             if isinstance(target, ast.Name):
-                names.append(target.id)
+                isReassignment = target.id in self.variables
                 self.assignTarget(target, variableType, isReassignment)
+
+                prefix = "" if isReassignment else variableType + " "
+                self.translation.emit(prefix + target.id + " = " + valueString + ";", "assignment")
+
             elif isinstance(target, ast.Attribute):
-                names.append(self.translateExpression(target))
+                # Attributes (like self.hp or player.hp)
+                targetString = self.translateExpression(target)
+                self.translation.emit(targetString + " = " + valueString + ";", "assignment")
+
             elif isinstance(target, ast.Tuple):
+                # Handle tuple unpacking targets (e.g., x, y = ...)
                 for element in target.elts:
                     if isinstance(element, ast.Name):
-                        names.append(element.id)
+                        isReassignment = element.id in self.variables
                         self.assignTarget(element, variableType, isReassignment)
 
-        variables = ""
-        for i in range(len(names)):
-            variables += names[i]
-            if i != len(names) - 1:
-                variables += ", "
-
-        translation += variables + " = "
-        translation += self.translateExpression(node.value)
-
-        self.translation.emit(translation + ";", "assignment")
+                        prefix = "" if isReassignment else variableType + " "
+                        self.translation.emit(prefix + element.id + " = " + valueString + ";", "assignment")
 
     def visit_AugAssign(self, node) -> None:
         translation = node.target.id
@@ -254,7 +277,7 @@ class Translator(ast.NodeVisitor):
                 self.translation.emit("}", "endbracket - else or elseif")
 
     def handleRange(self, args, newVariable: str) -> None:
-        start = 0
+        start = "0"
         step = 1
         if len(args) > 1:
             start = self.translateExpression(args[0])
@@ -263,7 +286,7 @@ class Translator(ast.NodeVisitor):
             end = self.translateExpression(args[0])
         if len(args) > 2:
             step = self.translateExpression(args[2])
-        if step == 1:
+        if step == 1 or step == "1":
             stepIncrease = newVariable + "++"
         else:
             stepIncrease = newVariable + " += " + step
@@ -281,7 +304,6 @@ class Translator(ast.NodeVisitor):
         newVariable = self.translateExpression(node.target)
         iterable = node.iter
         self.variables[newVariable] = self.createTypeAnnotation(node.target)
-        self.scopedVariables.append([])
 
         if (isinstance(iterable, ast.Call) and
                 isinstance(iterable.func, ast.Name) and
@@ -303,6 +325,12 @@ class Translator(ast.NodeVisitor):
             self.visit(stmt)
         self.exitBlock()
         self.translation.emit("}", "endbracket - for")
+
+    def visit_Break(self, node) -> None:
+        self.translation.emit("break;", "break")
+
+    def visit_Continue(self, node) -> None:
+        self.translation.emit("continue;", "continue")
 
     def visit_While(self, node) -> None:
         expression = self.translateExpression(node.test)
@@ -356,6 +384,11 @@ class Translator(ast.NodeVisitor):
         self.translation.emit(returnType + className + "(" + args + ")" + " {", "function")
 
         self.enterBlock()
+
+        for arg in node.args.args:
+            if arg.arg != "self":
+                self.scopedVariables[-1].append(str(arg.arg))
+
         for stmt in node.body:
             self.visit(stmt)
         self.exitBlock()
@@ -370,6 +403,8 @@ class Translator(ast.NodeVisitor):
             self.translation.emit("return;", "return")
 
     def visit_ClassDef(self, node):
+        self.classes.append(node.name)
+        self.classVariables[node.name] = {}
         previousScope = self.translation.toMain
         self.translation.toMain = False
         self.translation.currentClass = node.name
@@ -379,6 +414,7 @@ class Translator(ast.NodeVisitor):
         self.translation.emit("public:", "access modifier");
         self.enterBlock()
 
+        temporary_args_to_clean = []
         # Pre-pass for class variables
         for stmt in node.body:
             if isinstance(stmt, ast.FunctionDef) and stmt.name == "__init__":
@@ -391,6 +427,7 @@ class Translator(ast.NodeVisitor):
                             if argType == "str":
                                 argType = "string"
                         self.variables[arg.arg] = argType
+                        temporary_args_to_clean.append(arg.arg)
 
                 for sub_stmt in stmt.body:
                     if isinstance(sub_stmt, ast.Assign):
@@ -402,7 +439,11 @@ class Translator(ast.NodeVisitor):
                                 if var_type is None:
                                     var_type = self.raiseOrAuto(sub_stmt.value)
                                 self.translation.emit(var_type + " " + var_name + ";", "class variable")
-                                self.variables[var_name] = var_type
+                                self.classVariables[self.translation.currentClass][var_name] = var_type
+
+        for arg in temporary_args_to_clean:
+            if arg in self.variables:
+                self.variables.pop(arg)
 
         for stmt in node.body:
             self.visit(stmt)

@@ -23,7 +23,8 @@ def test_assign_multiple_variables():
 
     assert translator.translation.getCode() == (
         "int main() {\n"
-        "    int x, y = 5;\n"
+        "    int x = 5;\n"
+        "    int y = 5;\n"
         "    int z = x + y;\n"
         "}\n"
     )
@@ -232,3 +233,75 @@ def test_globals_and_empty_returns():
         "int main() {\n"
         "}\n"
     )
+
+def test_object_instantiation():
+    translator = Translator.Translator(True)
+    translator.translate(
+        "class Player:\n"
+        "    def __init__(self, name: str, hp: int):\n"
+        "        self.name = name\n"
+        "        self.hp = hp\n"
+        "    def takeDamage(self, amount: int):\n"
+        "        self.hp = self.hp - amount\n"
+        "my_player = Player(\"Hero\", 100)\n"
+        "my_player.takeDamage(10)\n"
+        "current_hp = my_player.hp"
+    )
+
+    assert translator.translation.getCode() == (
+        "#include <string>\n"
+        "\n"
+        "using namespace std;\n"
+        "\n"
+        "class Player {\n"
+        "public:\n"
+        "    string name;\n"
+        "    int hp;\n"
+        "    Player(string name, int hp) {\n"
+        "        this->name = name;\n"
+        "        this->hp = hp;\n"
+        "    }\n"
+        "    auto takeDamage(int amount) {\n"
+        "        this->hp = this->hp - amount;\n"
+        "    }\n"
+        "};\n"
+        "\n"
+        "int main() {\n"
+        "    Player my_player = Player(\"Hero\", 100);\n"
+        "    my_player.takeDamage(10);\n"
+        "    int current_hp = my_player.hp;\n"
+        "}\n"
+    )
+
+
+def test_function_parameter_isolation():
+    translator = Translator.Translator(True)
+    translator.translate(
+        "def calculate(value: int):\n"
+        "    return value\n"
+        "value = \"Now a string constant\""
+    )
+
+    assert "string value = " in translator.translation.getCode()
+
+def test_consecutive_loops_scope():
+    translator = Translator.Translator(True)
+    translator.translate(
+        "for i in range(5):\n"
+        "    x = 10\n"
+        "for j in range(5):\n"
+        "    y = \"test\""
+    )
+
+    code = translator.translation.getCode()
+    assert "int x = 10;" in code
+    assert "string y = \"test\";" in code
+
+
+def test_string_literal_type_deduction():
+    translator = Translator.Translator(True)
+    translator.translate(
+        "message = \"Hello World\""
+    )
+
+    assert "string message = \"Hello World\";" in translator.translation.getCode()
