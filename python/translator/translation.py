@@ -1,4 +1,4 @@
-from backend.Code import CodeElement
+from translator import code_element
 
 
 class Translation:
@@ -16,7 +16,7 @@ class Translation:
     def emit(self, code: str, codeType: str) -> None:
         # todo - inaccurate - makes entire line an assignment even if it contains e.g. calls
         line = "    " * self.indentation + code + "\n"
-        elem = CodeElement.CodeElement(line, codeType)
+        elem = code_element.CodeElement(line, codeType)
 
         if self.toMain:
             self.mainElements.append(elem)
@@ -24,27 +24,27 @@ class Translation:
             self.globalElements.append(elem)
 
     def wrapMain(self) -> None:
-        wrapped = [CodeElement.CodeElement("int main() {\n", "main")]
+        wrapped = [code_element.CodeElement("int main() {\n", "main")]
 
         for element in self.mainElements:
-            wrapped.append(CodeElement.CodeElement("    " + element.code, element.codeType))
+            wrapped.append(code_element.CodeElement("    " + element.code, element.codeType))
 
-        wrapped.append(CodeElement.CodeElement("}\n", "endbracket - main"))
+        wrapped.append(code_element.CodeElement("}\n", "endbracket - main"))
         self.mainElements = wrapped
 
     def finalAddImports(self):
         for element in self.imports:
-            self.finalCodeElements.append(CodeElement.CodeElement("#include <" + element + ">\n", "import"))
+            self.finalCodeElements.append(code_element.CodeElement("#include <" + element + ">\n", "import"))
         if len(self.imports) > 0:
-            self.finalCodeElements.append(CodeElement.CodeElement("\n", "separating line"))
-            self.finalCodeElements.append(CodeElement.CodeElement("using namespace std;\n", "namespace"))
-            self.finalCodeElements.append(CodeElement.CodeElement("\n", "separating line"))
+            self.finalCodeElements.append(code_element.CodeElement("\n", "separating line"))
+            self.finalCodeElements.append(code_element.CodeElement("using namespace std;\n", "namespace"))
+            self.finalCodeElements.append(code_element.CodeElement("\n", "separating line"))
 
     def finalCombineGlobalAndMain(self):
         for element in self.globalElements:
             self.finalCodeElements.append(element)
         if len(self.globalElements) > 0:
-            self.finalCodeElements.append(CodeElement.CodeElement("\n", "separating line"))
+            self.finalCodeElements.append(code_element.CodeElement("\n", "separating line"))
         for element in self.mainElements:
             self.finalCodeElements.append(element)
 

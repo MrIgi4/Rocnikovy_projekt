@@ -1,8 +1,6 @@
 import ast
 
-from packaging.specifiers import InvalidSpecifier
-
-from backend.Code import Translation
+from translator.translation import Translation
 
 
 class Translator(ast.NodeVisitor):
@@ -11,7 +9,7 @@ class Translator(ast.NodeVisitor):
     def __init__(self, debug: bool = False):
         self.isDebugging = debug
         self.abstractSyntaxTree = None
-        self.translation = Translation.Translation()
+        self.translation = Translation()
         self.variables = {}
         # List of variables by indentation for deletion after their scope is exited
         # Initialized with global scope
@@ -376,7 +374,7 @@ class Translator(ast.NodeVisitor):
                         self.translation.imports.add("string")
                 else:
                     # Shouldn't happen
-                    raise InvalidSpecifier("Invalid argument type at line " + str(arg.annotation.lineno))
+                    self.raiseOrAuto(arg.annotation)
             argList.append(argType + " " + str(arg.arg))
             self.variables[arg.arg] = argType
 
@@ -411,7 +409,7 @@ class Translator(ast.NodeVisitor):
 
         self.translation.emit("class " + node.name + " {", "class")
 
-        self.translation.emit("public:", "access modifier");
+        self.translation.emit("public:", "access modifier")
         self.enterBlock()
 
         temporary_args_to_clean = []
@@ -462,7 +460,7 @@ class Translator(ast.NodeVisitor):
         self.translation.finalAddImports()
         self.translation.finalCombineGlobalAndMain()
 
-    # Debbuging functions
+    # Debugging functions
     def printAst(self, text: str | None) -> None:
         if self.abstractSyntaxTree:
             print(self.abstractSyntaxTree)

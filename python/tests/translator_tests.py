@@ -1,7 +1,7 @@
-from backend.Code import Translator
+from translator.translator import Translator
 
 def test_assign_with_function():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "x = 5\n"
         "y = x + isEven(5, 7)\n"
@@ -15,7 +15,7 @@ def test_assign_with_function():
     )
 
 def test_assign_multiple_variables():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "x, y = 5\n"
         "z = x + y\n"
@@ -30,7 +30,7 @@ def test_assign_multiple_variables():
     )
 
 def test_assign_multiple_times():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "x = 23\n"
         "x = x + 1\n"
@@ -44,7 +44,7 @@ def test_assign_multiple_times():
     )
 
 def test_basic_if():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "x = 23\n"
         "if x == 23:\n"
@@ -61,7 +61,7 @@ def test_basic_if():
     )
 
 def test_2_for_loops():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "x = 23\n"
         "y = [1, 2, 3]\n"
@@ -89,7 +89,7 @@ def test_2_for_loops():
     )
 
 def test_else_ifs():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "if true:\n"
         "    x = -12\n"
@@ -119,7 +119,7 @@ def test_else_ifs():
     )
 
 def test_while():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "x = 0\n"
         "while(true):\n"
@@ -136,7 +136,7 @@ def test_while():
     )
 
 def test_class_def():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "class Player:\n"
         "    def __init__(self, name: str, hp: int):\n"
@@ -174,7 +174,7 @@ def test_class_def():
     )
 
 def test_scope_and_state_resets():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "class Enemy:\n"
         "    def __init__(self, damage: int):\n"
@@ -205,7 +205,7 @@ def test_scope_and_state_resets():
     )
 
 def test_globals_and_empty_returns():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "def __init__(global_var: int):\n"
         "    return\n"
@@ -235,7 +235,7 @@ def test_globals_and_empty_returns():
     )
 
 def test_object_instantiation():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "class Player:\n"
         "    def __init__(self, name: str, hp: int):\n"
@@ -275,7 +275,7 @@ def test_object_instantiation():
 
 
 def test_function_parameter_isolation():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "def calculate(value: int):\n"
         "    return value\n"
@@ -285,7 +285,7 @@ def test_function_parameter_isolation():
     assert "string value = " in translator.translation.getCode()
 
 def test_consecutive_loops_scope():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "for i in range(5):\n"
         "    x = 10\n"
@@ -299,7 +299,7 @@ def test_consecutive_loops_scope():
 
 
 def test_string_literal_type_deduction():
-    translator = Translator.Translator(True)
+    translator = Translator(True)
     translator.translate(
         "message = \"Hello World\""
     )
