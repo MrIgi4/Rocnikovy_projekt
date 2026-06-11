@@ -1,8 +1,8 @@
 module org.example.ui {
     requires javafx.controls;
     requires javafx.fxml;
+    requires org.fxmisc.richtext;
+    requires org.json;
 
-
-    opens org.example.ui to javafx.fxml;
     exports org.example.ui;
 }
