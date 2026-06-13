@@ -4,52 +4,75 @@ from translator import code_element
 class Translation:
     def __init__(self):
         self.indentation = 0
-        self.mainElements = []
-        self.globalElements = []
-        self.finalCodeElements = []
-        self.toMain = True
-        self.currentClass = None
+        self.main_elements = []
+        self.global_elements = []
+        self.final_code_elements = []
+        self.to_main = True
+        self.current_class = None
         self.imports = set()
 
-    #todo create CodeType class or find out that it's unnecessary
+    def emit(self, code: str, code_type: str) -> None:
+        # The translator will be responsible for emitting indentation and newlines
+        elem = code_element.CodeElement(code, code_type)
 
-    def emit(self, code: str, codeType: str) -> None:
-        # todo - inaccurate - makes entire line an assignment even if it contains e.g. calls
-        line = "    " * self.indentation + code + "\n"
-        elem = code_element.CodeElement(line, codeType)
-
-        if self.toMain:
-            self.mainElements.append(elem)
+        if self.to_main:
+            self.main_elements.append(elem)
         else:
-            self.globalElements.append(elem)
+            self.global_elements.append(elem)
 
-    def wrapMain(self) -> None:
+    def wrap_main(self) -> None:
         wrapped = [code_element.CodeElement("int main() {\n", "main")]
 
-        for element in self.mainElements:
-            wrapped.append(code_element.CodeElement("    " + element.code, element.codeType))
+        for element in self.main_elements:
+            wrapped.append(element)
 
         wrapped.append(code_element.CodeElement("}\n", "endbracket - main"))
-        self.mainElements = wrapped
+        self.main_elements = wrapped
 
-    def finalAddImports(self):
+    def final_add_imports(self):
         for element in self.imports:
-            self.finalCodeElements.append(code_element.CodeElement("#include <" + element + ">\n", "import"))
+            self.final_code_elements.append(code_element.CodeElement("#include <" + element + ">\n", "import"))
         if len(self.imports) > 0:
-            self.finalCodeElements.append(code_element.CodeElement("\n", "separating line"))
-            self.finalCodeElements.append(code_element.CodeElement("using namespace std;\n", "namespace"))
-            self.finalCodeElements.append(code_element.CodeElement("\n", "separating line"))
+            self.final_code_elements.append(code_element.CodeElement("\n", "separating line"))
+            self.final_code_elements.append(code_element.CodeElement("using namespace std;\n", "namespace"))
+            self.final_code_elements.append(code_element.CodeElement("\n", "separating line"))
 
-    def finalCombineGlobalAndMain(self):
-        for element in self.globalElements:
-            self.finalCodeElements.append(element)
-        if len(self.globalElements) > 0:
-            self.finalCodeElements.append(code_element.CodeElement("\n", "separating line"))
-        for element in self.mainElements:
-            self.finalCodeElements.append(element)
+    def final_combine_global_and_main(self):
+        for element in self.global_elements:
+            self.final_code_elements.append(element)
+        if len(self.global_elements) > 0:
+            self.final_code_elements.append(code_element.CodeElement("\n", "separating line"))
+        for element in self.main_elements:
+            self.final_code_elements.append(element)
 
-    def printCode(self) -> None:
-        print("".join(elem.code for elem in self.finalCodeElements))
+    def get_payload(self) -> dict:
+        """Stitches the final code together and calculates precise character bounds for Java."""
+        final_string = ""
+        hover_map = []
+        current_index = 0
 
-    def getCode(self) -> str:
-        return "".join(elem.code for elem in self.finalCodeElements)
+        ignored_tags = {"", "separating line", "newline", "space", "assignment operator"}
+
+        for elem in self.final_code_elements:
+            length = len(elem.code)
+
+            if elem.code_type and elem.code_type not in ignored_tags:
+                hover_map.append({
+                    "start": current_index,
+                    "end": current_index + length,
+                    "tag": elem.code_type
+                })
+
+            final_string += elem.code
+            current_index += length
+
+        return {
+            "cpp_code": final_string,
+            "hover_map": hover_map
+        }
+
+    def print_code(self) -> None:
+        print("".join(elem.code for elem in self.final_code_elements))
+
+    def get_code(self) -> str:
+        return "".join(elem.code for elem in self.final_code_elements)

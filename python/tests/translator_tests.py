@@ -7,7 +7,7 @@ def test_assign_with_function():
         "y = x + isEven(5, 7)\n"
     )
 
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
         "int main() {\n"
         "    int x = 5;\n"
         "    int y = x + isEven(5, 7);\n"
@@ -21,7 +21,7 @@ def test_assign_multiple_variables():
         "z = x + y\n"
     )
 
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
         "int main() {\n"
         "    int x = 5;\n"
         "    int y = 5;\n"
@@ -36,7 +36,7 @@ def test_assign_multiple_times():
         "x = x + 1\n"
     )
 
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
         "int main() {\n"
         "    int x = 23;\n"
         "    x = x + 1;\n"
@@ -51,7 +51,7 @@ def test_basic_if():
         "    x = x + 1\n"
     )
 
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
         "int main() {\n"
         "    int x = 23;\n"
         "    if (x == 23) {\n"
@@ -71,7 +71,7 @@ def test_2_for_loops():
         "    x += 1\n"
     )
 
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
         "#include <vector>\n"
         "\n"
         "using namespace std;\n"
@@ -101,7 +101,7 @@ def test_else_ifs():
         "    x = 3\n"
     )
 
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
         "int main() {\n"
         "    if (true) {\n"
         "        int x = -12;\n"
@@ -126,7 +126,7 @@ def test_while():
         "    x = x + 1\n"
     )
 
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
         "int main() {\n"
         "    int x = 0;\n"
         "    while (true) {\n"
@@ -148,7 +148,7 @@ def test_class_def():
         "        return self.hp"
     )
 
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
          '#include <string>\n'
          '\n'
          'using namespace std;\n'
@@ -157,6 +157,7 @@ def test_class_def():
          'public:\n'
          '    string name;\n'
          '    int hp;\n'
+         '\n'
          '    Player(string name, int hp) {\n'
          '        this->name = name;\n'
          '        this->hp = hp;\n'
@@ -184,10 +185,11 @@ def test_scope_and_state_resets():
         "        self.damage = damage"
     )
 
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
         "class Enemy {\n"
         "public:\n"
         "    int damage;\n"
+        "\n"
         "    Enemy(int damage) {\n"
         "        this->damage = damage;\n"
         "    }\n"
@@ -195,6 +197,7 @@ def test_scope_and_state_resets():
         "class Weapon {\n"
         "public:\n"
         "    int damage;\n"
+        "\n"
         "    Weapon(int damage) {\n"
         "        this->damage = damage;\n"
         "    }\n"
@@ -215,13 +218,14 @@ def test_globals_and_empty_returns():
         "    def crash(self):\n"
         "        return"
     )
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
         "auto __init__(int global_var) {\n"
         "    return;\n"
         "}\n"
         "class App {\n"
         "public:\n"
         "    int version;\n"
+        "\n"
         "    App(int version) {\n"
         "        this->version = version;\n"
         "    }\n"
@@ -248,7 +252,7 @@ def test_object_instantiation():
         "current_hp = my_player.hp"
     )
 
-    assert translator.translation.getCode() == (
+    assert translator.translation.get_code() == (
         "#include <string>\n"
         "\n"
         "using namespace std;\n"
@@ -257,6 +261,7 @@ def test_object_instantiation():
         "public:\n"
         "    string name;\n"
         "    int hp;\n"
+        "\n"
         "    Player(string name, int hp) {\n"
         "        this->name = name;\n"
         "        this->hp = hp;\n"
@@ -282,7 +287,7 @@ def test_function_parameter_isolation():
         "value = \"Now a string constant\""
     )
 
-    assert "string value = " in translator.translation.getCode()
+    assert "string value = " in translator.translation.get_code()
 
 def test_consecutive_loops_scope():
     translator = Translator(True)
@@ -293,7 +298,7 @@ def test_consecutive_loops_scope():
         "    y = \"test\""
     )
 
-    code = translator.translation.getCode()
+    code = translator.translation.get_code()
     assert "int x = 10;" in code
     assert "string y = \"test\";" in code
 
@@ -304,4 +309,4 @@ def test_string_literal_type_deduction():
         "message = \"Hello World\""
     )
 
-    assert "string message = \"Hello World\";" in translator.translation.getCode()
+    assert "string message = \"Hello World\";" in translator.translation.get_code()

@@ -19,7 +19,7 @@ if __name__ == "__main__":
         translator = Translator()
         translator.translate(python_source_code)
 
-        cpp_output = translator.translation.getCode()
+        cpp_output = translator.translation.get_code()
 
         # Example documentation
         # todo add actual documentation
